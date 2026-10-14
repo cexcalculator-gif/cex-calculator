@@ -1,0 +1,23 @@
+{
+  "model": "R",
+  "status": "testing",
+  "unit": "mm",
+  "profile_size": 15,
+  "stock_length": 8000,
+  "saw_kerf": 4,
+  "max_nominal_step": 128,
+  "projections": {
+    "200": {"height_add": 190, "side_vertical_count": 4, "short_horizontal_count": 8},
+    "300": {"height_add": 390, "side_vertical_count": 4, "short_horizontal_count": 8},
+    "400": {"height_add": 590, "side_vertical_count": 6, "short_horizontal_count": 8},
+    "500": {"height_add": 790, "side_vertical_count": 8, "short_horizontal_count": 8},
+    "600": {"height_add": 990, "side_vertical_count": 10, "short_horizontal_count": 8}
+  },
+  "parts": {
+    "bent_vertical": {"length": "height + height_add", "count": "ceil(width / 128)"},
+    "side_vertical": {"length": "height", "count": "side_vertical_count"},
+    "frame_horizontal": {"length": "width - 30", "count": 2},
+    "long_horizontal": {"length": "width", "count": 4},
+    "short_horizontal": {"length": "projection", "count": 8}
+  }
+}
