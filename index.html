@@ -65,6 +65,27 @@ body{font-family:Arial,sans-serif;color:#000}.sheet{padding:0;margin:0}.welder{b
  .welder.very-dense-drawings .welddrawing{max-height:91px!important}
  .warehouse .stock-table{font-size:15px}
 }
+</style><style id="compact-welder-a4-final">
+/* The welder sheet is a single portrait A4 with two drawings per row. */
+.welder{box-sizing:border-box;width:210mm;max-width:100%;margin:12px auto;padding:8mm!important}
+.welder .window-grid,.welder .balcony-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:3mm 4mm!important;align-items:start!important}
+.welder .welditem,.welder .welditem.balcony-drawing{grid-column:auto!important;min-width:0!important;padding:1mm!important;margin:0!important;break-inside:avoid!important;page-break-inside:avoid!important}
+.welder .welditem h2{font-size:12px!important;line-height:1.1!important;margin:0 0 1mm!important}
+.welder .weldcaption{font-size:9px!important;line-height:1.1!important;margin:0!important}
+.welder .welddrawing,.welder .balcony-drawing .welddrawing{display:block!important;width:100%!important;max-width:100%!important;max-height:57mm!important;height:52mm!important;margin:0 auto!important;object-fit:contain!important}
+.welder h1{font-size:17px!important;line-height:1.15!important;margin:0 0 1mm!important}
+.welder .weldmeta{font-size:11px!important;margin:0 0 3mm!important}
+@media print{
+ @page{size:A4 portrait;margin:7mm}
+ .welder{width:196mm!important;max-width:196mm!important;min-height:0!important;height:auto!important;max-height:none!important;padding:0!important;margin:0!important;overflow:visible!important;break-after:page!important;page-break-after:always!important}
+ .welder .window-grid,.welder .balcony-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:2mm 3mm!important}
+ .welder .welditem,.welder .welditem.balcony-drawing{padding:0.5mm 1mm!important}
+ .welder .welddrawing,.welder .balcony-drawing .welddrawing,.welder.dense-drawings .welddrawing,.welder.very-dense-drawings .welddrawing{height:51mm!important;max-height:51mm!important;max-width:100%!important}
+ .welder .welditem h2{font-size:11px!important}
+ .welder .weldcaption{font-size:8px!important}
+ .welder h1{font-size:15px!important}
+ .welder .weldmeta{font-size:10px!important;margin-bottom:2mm!important}
+}
 </style></head><body><main><div class="no-print"><h1>Калькулятор цеха — модель R</h1><p class="muted">Тестовая версия модели R. Квадратура считается автоматически по размерам замерщика. Раскрой балконов предварительный: угловые соединения и независимые выносы требуют проверки технологом.</p><section class="panel"><label>Номер заказа</label><input id="order" placeholder="Например, 2805"><label>Квадратура заказа, м² (автоматически)</label><input id="area" type="text" readonly placeholder="Рассчитается после ввода размеров"><label>Модель заказа</label><input id="model" value="R-1"></section><section class="panel"><h2>Размеры от замерщика</h2><div id="windows"></div><button type="button" id="add">+ Добавить окно</button><button type="button" id="addBalcony">+ Добавить балкон</button><div id="balconies"></div></section><button type="button" id="calculate">Рассчитать</button><button type="button" id="print">Печать / PDF</button><button type="button" id="reset" class="remove">Новый заказ / Очистить всё</button><p id="error" class="warning" hidden></p></div><div id="result"></div></main><script>
 'use strict';const $=id=>document.getElementById(id);const projectionData={200:{add:190,side:4},300:{add:390,side:4},400:{add:590,side:6},500:{add:790,side:8},600:{add:990,side:10}};let seq=0,balconySeq=0;
 function addWindow(){if(document.querySelectorAll('.window').length>=8){alert('Можно добавить не более 8 окон.');return;}seq++;const div=document.createElement('div');div.className='window';div.innerHTML=`<strong>Окно ${seq}</strong><div class="grid"><div><label>Ширина, мм</label><input class="w" type="number" min="1" step="1" placeholder="2900"></div><div><label>Высота, мм</label><input class="h" type="number" min="1" step="1" placeholder="1580"></div><div><label>Количество одинаковых окон, шт.</label><input class="qty" type="number" min="1" max="100" step="1" value="1"></div><div><label>Вынос, мм</label><select class="p">${`<option value="0">0 — прямое окно</option>`+Object.keys(projectionData).map(x=>`<option value="${x}" ${x==='400'?'selected':''}>${x}</option>`).join('')}</select></div><div><label>Установка</label><select class="mount"><option value="outside">Снаружи откоса</option><option value="inside">Внутри откоса</option></select></div><div><label>Крыша</label><select class="roof"><option value="none">Без крыши</option><option value="profiled">С крышей — профнастил</option><option value="pvc">С крышей — ПВХ</option></select></div></div><button class="remove" type="button">Удалить окно</button>`;div.querySelector('.remove').onclick=()=>div.remove();const syncStraight=()=>{const isStraight=div.querySelector('.p').value==='0';const mount=div.querySelector('.mount'),roof=div.querySelector('.roof');if(isStraight){mount.value='inside';roof.value='none'}mount.disabled=isStraight;roof.disabled=isStraight};div.querySelector('.p').addEventListener('change',syncStraight);syncStraight();$('windows').appendChild(div)}
