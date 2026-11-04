@@ -257,7 +257,7 @@ function awningPickup(rows,balconies){
  for(const w of railPieces){if(w>4000){lines.push(`Рейка ${w} мм — составная`);continue}
   let i=rails.findIndex(rem=>rem>=w+4);if(i<0)rails.push(4000-w-4);else rails[i]-=w+4;
  }
- if(rails.length)lines.push(`Рейка — ${rails.length} шт.`);
+ if(railPieces.length){const rm=railPieces.reduce((a,b)=>a+b,0)/1000,fm=Math.round(rm*100)/100;lines.push(`Рейка — ${String(fm).replace('.',',')} м (расход)`+(rails.length?` · хлыстов 4 м: ${rails.length} шт.`:''))}
  return lines.length?`<div class="roof-pickup"><h2>Козырёк</h2>${lines.map(x=>`<div class="roof-line">${x}</div>`).join('')}</div>`:'';
 }
 
