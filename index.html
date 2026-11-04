@@ -219,7 +219,9 @@ function m15parts(it){const bal=!!it.isBalcony,p=bal?it.pf:it.p,q=bal?1:it.qty;i
 function cutting(rows,stock=8000){const grouped=new Map();for(const r of rows)for(const v of r.parts)grouped.set(v.len,(grouped.get(v.len)||0)+v.count);const pieces=[...grouped].flatMap(([len,count])=>Array.from({length:count},()=>len)).sort((a,b)=>b-a);const bins=[];for(const len of pieces){let best=-1,remain=Infinity;for(let i=0;i<bins.length;i++){const rem=bins[i].remaining-len-4;if(rem>=0&&rem<remain){best=i;remain=rem}}if(best<0)bins.push({remaining:stock-len-4,parts:[len]});else{bins[best].remaining-=len+4;bins[best].parts.push(len)}}const patterns=new Map();for(const bin of bins){const counts=new Map();for(const len of bin.parts)counts.set(len,(counts.get(len)||0)+1);const desc=[...counts].sort((a,b)=>b[0]-a[0]).map(([len,n])=>`${len}${n>1?' × '+n:''}`).join(' + ');const key=desc+'|'+bin.remaining;const obj=patterns.get(key)||{desc,remaining:bin.remaining,count:0};obj.count++;patterns.set(key,obj)}return {bins,patterns:[...patterns.values()],total:pieces.reduce((a,b)=>a+b,0),cuts:pieces.length}}
 
 // Козырьки: компактная ведомость выдачи, внутренний раскрой не печатается.
+let awnStats={railM:0,sticks:0,eq:0,byMat:{}};
 function awningPickup(rows,balconies){
+ awnStats={railM:0,sticks:0,eq:0,byMat:{}};
  const groups=new Map(),railPieces=[],lex=new Map();
  function add(width,depth,material){
   if(width<=0||depth<=0)return;
@@ -227,6 +229,7 @@ function awningPickup(rows,balconies){
   const stock=1160,overlap=material==='pvc'?300:200,advance=stock-overlap;
   const n=Math.max(1,Math.ceil((width-overlap)/advance));
   const last=width-(n-1)*advance;
+  const eqv=(n-1)+(last===stock?1:last/stock);awnStats.eq+=eqv;awnStats.byMat[material]=(awnStats.byMat[material]||0)+eqv;
   const key=material+'|'+depth;
   const g=groups.get(key)||{material,depth,whole:0,small:[]};
   g.whole+=n-1;
@@ -257,9 +260,31 @@ function awningPickup(rows,balconies){
  for(const w of railPieces){if(w>4000){lines.push(`Рейка ${w} мм — составная`);continue}
   let i=rails.findIndex(rem=>rem>=w+4);if(i<0)rails.push(4000-w-4);else rails[i]-=w+4;
  }
- if(railPieces.length){const rm=railPieces.reduce((a,b)=>a+b,0)/1000,fm=Math.round(rm*100)/100;lines.push(`Рейка — ${String(fm).replace('.',',')} м (расход)`+(rails.length?` · хлыстов 4 м: ${rails.length} шт.`:''))}
+ awnStats.railM=railPieces.reduce((a,b)=>a+b,0)/1000;awnStats.sticks=rails.length;if(rails.length)lines.push(`Рейка — ${rails.length} шт.`);
  return lines.length?`<div class="roof-pickup"><h2>Козырёк</h2>${lines.map(x=>`<div class="roof-line">${x}</div>`).join('')}</div>`:'';
 }
+
+// Скрытый расчёт расхода материалов (не печатается). Нормы — Правила_калькулятора.md, 04.11.2026.
+const NORM={paintKgM2:20/150,solventLM2:40/150,screwSmallPer100g:22,screwBigPer100g:14,screwSmallPerSheet:14,screwBigPerSheet:8,stripPcs:4,stripLenMm:100};
+function calcConsumption(rows,balconies,cut,totalArea){
+ const r2=x=>Math.round(x*100)/100,out={area:r2(totalArea),profiles:[],model:$('model').value};
+ if(mModel()){
+  const all15=[...rows,...balconies.map(b=>({...b,isBalcony:true}))].flatMap(it=>m15parts(it));
+  const c15=cutting([{parts:all15.map(v=>({len:v.len,count:v.count}))}],8000);
+  out.profiles.push({name:'Профиль 30×20',takenM:cut.bins.length*10,pureM:r2(cut.total/1000),sticks:cut.bins.length});
+  out.profiles.push({name:'Профиль 15×15',takenM:c15.bins.length*8,pureM:r2(c15.total/1000),sticks:c15.bins.length});
+ }else out.profiles.push({name:'Профиль 15×15',takenM:cut.bins.length*8,pureM:r2(cut.total/1000),sticks:cut.bins.length});
+ out.railM=r2(awnStats.railM);out.railSticks=awnStats.sticks;
+ out.sheetEq=r2(awnStats.eq);out.sheetByMat=Object.fromEntries(Object.entries(awnStats.byMat).map(([k,v])=>[k,r2(v)]));
+ out.screwSmall=Math.ceil(awnStats.eq*NORM.screwSmallPerSheet-1e-9);out.screwBig=Math.ceil(awnStats.eq*NORM.screwBigPerSheet-1e-9);
+ out.screwSmallG=r2(out.screwSmall/NORM.screwSmallPer100g*100);out.screwBigG=r2(out.screwBig/NORM.screwBigPer100g*100);
+ out.paintKg=r2(totalArea*NORM.paintKgM2);out.solventL=r2(totalArea*NORM.solventLM2);
+ const straightWin=rows.filter(r=>r.p===0).reduce((v,r)=>v+r.qty,0),straightBal=balconies.filter(b=>b.pf===0).length;
+ out.stripPcs=(straightWin+straightBal)*NORM.stripPcs;out.stripM=r2(out.stripPcs*NORM.stripLenMm/1000);
+ return out}
+function showConsumption(c){let b=document.getElementById('consBox');if(!b){b=document.createElement('div');b.id='consBox';b.className='no-print';document.querySelector('main').appendChild(b)}
+ const dbg=/[?&]debug/.test(location.search);b.hidden=!dbg;
+ b.innerHTML=dbg?`<h2>Скрытый расход (только для проверки)</h2><pre>${esc(JSON.stringify(c,null,1))}</pre>`:'';window.lastConsumption=c}
 
 function render(){try{
 $('error').hidden=true;
@@ -303,7 +328,7 @@ const pickup=awningPickup(rows,balconies);const stoykaTotal=rows.reduce((v,r)=>v
 let mBalls=0,mFlowers=0,mMand=0;const pickupLines=[...pickup.matchAll(/<div class="roof-line">([^<]*)<\/div>/g)].map(m=>m[1]);pickupLines.unshift(`${stockLabel()} — ${cut.bins.length} шт.`);if(mModel()){const all15=[...rows,...balconies.map(b=>({...b,isBalcony:true}))].flatMap(it=>m15parts(it));const cut15=cutting([{parts:all15.map(v=>({len:v.len,count:v.count}))}],8000);
 {const st=all15.filter(v=>v.straight).reduce((x,v)=>x+v.count,0);mBalls=st*2;mFlowers=st*4;if(isM1())mMand=all15.filter(v=>v.bent).reduce((x,v)=>x+v.count,0)}const g30=new Map();pickupLines.splice(0,pickupLines.length,...[...pickup.matchAll(/<div class="roof-line">([^<]*)<\/div>/g)].map(m=>m[1]),`Профиль 30×20 — ${cut.bins.length} шт.`,`Профиль 15×15 — ${cut15.bins.length} шт.`)}
 html+=`<section class="sheet warehouse"><h1>ВЕДОМОСТЬ МАТЕРИАЛОВ · СКЛАД</h1><div class="weldmeta">Заказ № ${order} · Модель ${model} · ${totalArea.toFixed(2).replace('.',',')} м²${instRaw?' · '+instDate:''}</div><h2>Материалы</h2><table class="stock-table"><thead><tr><th>Материал / размер</th><th>Количество</th></tr></thead><tbody>${pickupLines.length?pickupLines.map(line=>{const match=line.match(/^(.*?)(?:\s*[—-]\s*)(\d+ шт\.)$/);return `<tr><td>${esc(match?match[1]:line)}</td><td>${esc(match?match[2]:'—')}</td></tr>`}).join(''):'<tr><td colspan="2">Козырёк не требуется</td></tr>'}</tbody></table>${prelim?'<p style="font-size:15px;margin:8px 0">Предварительно: угловые соединения балконов в расчёт профиля не включены.</p>':''}${(tangaTotal||stoykaTotal||mBalls||mMand)?`<h2>Декор</h2><table class="stock-table"><thead><tr><th>Позиция</th><th>Количество</th></tr></thead><tbody>${tangaTotal?`<tr><td>${decorName().charAt(0).toUpperCase()+decorName().slice(1)}</td><td>${tangaTotal} шт.</td></tr>`:''}${stoykaTotal?`<tr><td>${stoykaName().charAt(0).toUpperCase()+stoykaName().slice(1)}</td><td>${stoykaTotal} шт.</td></tr>`:''}${mMand?`<tr><td>Мандарин</td><td>${mMand} шт.</td></tr>`:''}${mBalls?`<tr><td>Шарик</td><td>${mBalls} шт.</td></tr><tr><td>Печени гул</td><td>${mFlowers} шт.</td></tr>`:''}</tbody></table>`:''}<div class="stock-sign"><span>Выдал: __________________</span><span>Дата: ______________</span></div></section>`;
-$('result').innerHTML=html;fitCells();return true
+$('result').innerHTML=html;try{showConsumption(calcConsumption(rows,balconies,cut,totalArea))}catch(_){}fitCells();return true
 }catch(e){$('error').textContent=e.message;$('error').hidden=false;$('result').innerHTML='';return false}}
 $('reset').onclick=()=>{if(!confirm('Очистить весь заказ и начать новый?'))return;$('order').value='';$('area').value='';if($('instdate'))$('instdate').value='';$('model').value='R-10';$('windows').innerHTML='';$('balconies').innerHTML='';$('result').innerHTML='';$('error').hidden=true;seq=0;balconySeq=0;addWindow();};function updateEstimate(){const a=Number($('estArea').value),r=Number($('estReserve').value)||0,out=$('estOut');if(!(a>0)){out.textContent='—';return}const k=1+Math.min(Math.max(r,0),50)/100,f=n=>Math.ceil(a*n*k).toLocaleString('ru-RU');
 if(mModel()){out.textContent='≈ '+f(0.27)+' хлыстов 30×20 по 10 м (от '+f(0.24)+' до '+f(0.29)+') и ≈ '+f(1.58)+' хлыстов 15×15 по 8 м (от '+f(1.5)+' до '+f(1.65)+')';return}
